@@ -1,11 +1,11 @@
 Backup tar.gz files to s3 from an apache index page. Relies on environmental
 variables:
 
- - HURRAH_BUCKET
- - HURRAH_ACCESS_KEY_ID
- - HURRAH_SECRET_ACCESS_KEY
- - HURRAH_TITLE
- - HURRAH_INDEX
+ - HURRAH_BUCKET : s3 bucket
+ - HURRAH_ACCESS_KEY_ID : Amazon access key
+ - HURRAH_SECRET_ACCESS_KEY : Amazon secret key
+ - HURRAH_TITLE : Title of generated s3 index file for display only.
+ - HURRAH_INDEX : URL of the apache index
 
 It is meant to be run from cron however often you see fit, but before the files
 are deleted from the server.
