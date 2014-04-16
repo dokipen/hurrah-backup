@@ -1,0 +1,19 @@
+<html>
+<body>
+<p>
+<h1><%= title %> Backups</h1>
+</p>
+<p>
+<ul>
+    <% archives.each do |archive| %>
+    <li>
+    <a href="<%= archive[:href] %>"><%= archive[:date] %></a>
+    </li>
+    <% end %>
+</ul>
+</p>
+<p>
+Created with <a href="https://github.com/dokipen/hurrah-backup">Hurrah Backup</a>.
+</p>
+</body>
+</html>

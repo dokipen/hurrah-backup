@@ -1,0 +1,97 @@
+#!/usr/bin/env ruby
+require 'nokogiri'
+require 'aws/s3'
+require 'open-uri'
+require 'uri'
+require 'fileutils'
+require 'erb'
+require 'digest/md5'
+
+include FileUtils::Verbose
+include AWS::S3
+
+BASE_HREF = ENV['HURRAH_INDEX']
+BUCKET = ENV['HURRAH_BUCKET']
+APACHE_TIMESTAMP = '%d-%b-%Y %H:%M'
+ARCHIVE_TIMESTAMP = "%Y%m%d_%H%M"
+ARCHIVE_FORMAT = "%s.tar.gz"
+TITLE = ENV['HURRAH_TITLE']
+
+Base.establish_connection!(
+  :access_key_id => ENV['HURRAH_ACCESS_KEY_ID'],
+  :secret_access_key => ENV['HURRAH_SECRET_ACCESS_KEY']
+)
+
+def fetch href, target
+  begin
+    File.open(target, 'wb') do |out|
+      open(URI.join(BASE_HREF, href)) do |input|
+        out.write(input.read)
+      end
+    end
+  rescue Exception
+    raise "Failed to fetch #{href}: #{$!}"
+  end
+end
+
+def upload source
+  S3Object.store(source, open(source), BUCKET)
+  policy = S3Object.acl(source, BUCKET)
+  policy.grants = [ ACL::Grant.grant(:public_read) ]
+  S3Object.acl(source, BUCKET, policy)
+end
+
+def verify file, checksum
+  digest = Digest::MD5.hexdigest(File.read(file))
+  if digest != File.read(checksum).strip
+    raise "Checksum failed for #{file}"
+  end
+end
+
+def mkindex
+  title = TITLE
+  archives = Bucket.objects(BUCKET).select do |obj|
+    obj.key =~ /\.tar\.gz$/
+  end.map do |obj|
+    date = DateTime.strptime(obj.key, ARCHIVE_FORMAT % ARCHIVE_TIMESTAMP)
+    { :href => obj.url, :date => date.strftime("%c") }
+  end
+  open('index.html', 'wb') do |out|
+    template = ERB.new(File.read('index.html.erb'))
+    out.write(template.result(binding))
+  end
+  upload 'index.html'
+  rm 'index.html'
+end
+
+def process_index
+  index = Nokogiri::HTML(open(BASE_HREF))
+  index.css('table tr').each do |tr|
+    _, file, date, _ = tr.css('td')
+    next unless file and date
+    href = file.css('a')[0]['href']
+    begin
+      if href =~ /\.tar\.gz$/
+        checksum_href = "#{href[/(.*)\.tar\.gz/, 1]}.md5"
+        dt = DateTime.strptime(date.content, APACHE_TIMESTAMP)
+        target = ARCHIVE_FORMAT % dt.strftime(ARCHIVE_TIMESTAMP)
+        checksum_target = "#{target}.md5"
+        if S3Object.exists?(target, BUCKET)
+          next
+        end
+        fetch(href, target)
+        fetch(checksum_href, checksum_target)
+        verify(target, checksum_target)
+        upload(target)
+        rm target
+        rm checksum_target
+      end
+    rescue Exception
+      puts "Failed to process #{href}"
+      puts $!, "\t#{$@.join("\n\t")}"
+    end
+  end
+end
+
+process_index
+mkindex
