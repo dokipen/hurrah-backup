@@ -10,4 +10,10 @@ variables:
 It is meant to be run from cron however often you see fit, but before the files
 are deleted from the server.
 
-TODO: Verify against checksums if they exist.
+Files listed are expected to end with tar.gz and have an associated md5sum with
+the same name, that ends in md5. Ex.
+
+awesomebackup.tar.gz
+awesomebackup.md5
+
+Files will be renamed by timestamp as reported by apache before uploading to s3.
